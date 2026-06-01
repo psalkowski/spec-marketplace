@@ -1,0 +1,15 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "spec-marketplace",
+  "description": "Personal marketplace for the spec workflow toolkit — Obsidian-vault-backed brainstorm/plan/execute skills, plan-execution agents, and a project setup command.",
+  "owner": {
+    "name": "psalkowski"
+  },
+  "plugins": [
+    {
+      "name": "spec",
+      "source": "./plugins/spec",
+      "category": "workflow"
+    }
+  ]
+}

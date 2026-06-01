@@ -1,0 +1,16 @@
+{
+  "name": "spec",
+  "description": "Vault-backed spec workflow: brainstorm -> plan -> execute, routing every artifact into an Obsidian vault and pinning plan execution to the right model. Generic and config-driven; reads per-project settings from a JSON block in CLAUDE.local.md.",
+  "version": "0.1.0",
+  "author": {
+    "name": "psalkowski"
+  },
+  "keywords": [
+    "spec",
+    "brainstorming",
+    "planning",
+    "obsidian",
+    "workflow",
+    "agents"
+  ]
+}
