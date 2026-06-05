@@ -7,7 +7,7 @@ A personal [Claude Code](https://claude.com/claude-code) marketplace hosting the
 ## What's in the box
 
 - **Skills** — `spec:brainstorm` → `spec:plan` → `spec:execute`, wrappers over `superpowers` + `grill-with-docs` (+ your project's design skill) that route output to the vault.
-- **Agents** — `plan-executor` (Sonnet), `plan-executor-heavy` (Opus), `plan-reviewer` (Opus, read-only) for cheap, reviewed plan execution.
+- **Agents** — `spec:plan-executor` (Sonnet), `spec:plan-executor-heavy` (Opus), `spec:plan-reviewer` (Opus, read-only) for cheap, reviewed plan execution.
 - **Command** — `/spec:setup` configures a project and scaffolds its vault.
 - **Vault template** — a full Obsidian vault skeleton (Daily, References, Roadmap, Scratch, Projects + a project subtree), every folder carrying an `_index.md` that documents its purpose and the frontmatter to use.
 

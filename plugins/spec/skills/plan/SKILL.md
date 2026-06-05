@@ -27,7 +27,7 @@ Read the `spec` config — the fenced ```json under `## spec configuration` in `
 
 3. **Plan frontmatter:** copy the template from `{subpath}/Plans/_index.md` (the folder's `_index.md` is the source of truth for the field set).
 
-4. **MANDATORY: embed the Execution model policy section** (template below) near the top, right after the Tech Stack header. Decide which tasks are cross-cutting/**heavy** — large refactors, orchestration/engine code, deletions that cascade across files, hard debugging — and list them under `plan-executor-heavy`; everything else goes under `plan-executor`.
+4. **MANDATORY: embed the Execution model policy section** (template below) near the top, right after the Tech Stack header. Decide which tasks are cross-cutting/**heavy** — large refactors, orchestration/engine code, deletions that cascade across files, hard debugging — and list them under `spec:plan-executor-heavy`; everything else goes under `spec:plan-executor`.
 
 ## Execution model policy — paste into every plan, fill in the task lists
 
@@ -38,14 +38,14 @@ Run **subagent-driven**: the orchestrator reads this table and dispatches each t
 
 | Tasks | `subagent_type` | Pins |
 |---|---|---|
-| <routine task numbers> | `plan-executor` | Sonnet, effort `high` |
-| <cross-cutting task numbers> | `plan-executor-heavy` | Opus, effort `medium` |
-| A task stuck on a red test | re-dispatch to `plan-executor-heavy` | Opus (`/effort xhigh` only to debug) |
+| <routine task numbers> | `spec:plan-executor` | Sonnet, effort `high` |
+| <cross-cutting task numbers> | `spec:plan-executor-heavy` | Opus, effort `medium` |
+| A task stuck on a red test | re-dispatch to `spec:plan-executor-heavy` | Opus (`/effort xhigh` only to debug) |
 
-After each executor returns, the orchestrator dispatches `plan-reviewer` (Opus, effort `high`, read-only) on the task's diff — Sonnet writes, Opus checks, catching missed detail cheaply. On **CHANGES-NEEDED**, re-dispatch the **same** executor with the fix list, then review again; on **APPROVE**, surface to the user for sign-off. Dispatch by **explicit** `subagent_type` (description matching is assistive only). The orchestrator stays on Sonnet or Opus-`low`; never leave `xhigh`/`max` as a standing default.
+After each executor returns, the orchestrator dispatches `spec:plan-reviewer` (Opus, effort `high`, read-only) on the task's diff — Sonnet writes, Opus checks, catching missed detail cheaply. On **CHANGES-NEEDED**, re-dispatch the **same** executor with the fix list, then review again; on **APPROVE**, surface to the user for sign-off. Dispatch by **explicit** `subagent_type` (description matching is assistive only). The orchestrator stays on Sonnet or Opus-`low`; never leave `xhigh`/`max` as a standing default.
 ````
 
-The agents `plan-executor`, `plan-executor-heavy`, and `plan-reviewer` ship with this plugin. If your harness can't see them, the plan can't execute as written — install/enable the `spec` plugin before relying on this section.
+The agents `spec:plan-executor`, `spec:plan-executor-heavy`, and `spec:plan-reviewer` ship with this plugin (plugin agents are namespaced — bare names don't resolve). If your harness can't see them, the plan can't execute as written — install/enable the `spec` plugin before relying on this section.
 
 ## Executing it later
 

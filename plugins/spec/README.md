@@ -9,9 +9,9 @@ Vault-backed spec workflow for Claude Code: **brainstorm → plan → execute**,
 | skill | `spec:brainstorm` | `superpowers:brainstorming` + `grill-with-docs` + (configured) design skill → spec in the vault |
 | skill | `spec:plan` | `superpowers:writing-plans` → plan in the vault, with the execution-model policy table |
 | skill | `spec:execute` | `superpowers:subagent-driven-development` → dispatches the agents below, review-gated |
-| agent | `plan-executor` | Sonnet, `high` — routine plan tasks |
-| agent | `plan-executor-heavy` | Opus, `medium` — cross-cutting tasks |
-| agent | `plan-reviewer` | Opus, `high`, read-only — reviews each task's diff |
+| agent | `spec:plan-executor` | Sonnet, `high` — routine plan tasks |
+| agent | `spec:plan-executor-heavy` | Opus, `medium` — cross-cutting tasks |
+| agent | `spec:plan-reviewer` | Opus, `high`, read-only — reviews each task's diff |
 | command | `/spec:setup` | writes config + scaffolds the vault (idempotent) |
 | templates | `templates/vault`, `templates/project` | the Obsidian vault skeleton `/spec:setup` materializes |
 
