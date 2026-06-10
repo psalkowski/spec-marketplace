@@ -1,52 +1,87 @@
 ---
 name: plan
-description: Use when creating, writing, or drafting an implementation plan for a feature, or when the user invokes /spec:plan. Saves the plan to the project's Obsidian vault and embeds the pinned-agent execution policy.
+description: Use for any non-trivial feature work — scoping, designing, specifying, or planning a feature, page, component, or behaviour change — or when the user invokes /spec:plan. Produces a durable spec in the project's Obsidian vault; adds a plan doc and picks an execution mode only when the size of the work warrants it.
 ---
 
 # spec:plan
 
-Wrapper over the standard planning workflow that adds two rules: plans live in the project's Obsidian vault, and every plan embeds the pinned-agent execution policy so it can be executed cheaply later. Generic and config-driven.
+The single front door for feature work. It always produces a **Spec** — the durable intent + design document — in the vault. A separate **Plan doc** and the execution mode are decisions this skill makes based on the size of the work; most features need neither a plan doc nor a session handoff.
+
+Self-contained: no superpowers skills required.
 
 ## Project config (read this first)
 
-Read the `spec` config — the fenced ```json under `## spec configuration` in `CLAUDE.local.md`. It provides `project`, `vault.name`, `vault.root`, `vault.subpath`, and optional `designSkill`. **If absent, STOP** and tell the user to run `/spec:setup`. `{subpath}` = `vault.subpath`, `{root}` = `vault.root`.
+Read the `spec` config — the fenced ```json under `## spec configuration`in`CLAUDE.local.md`. It provides `project`, `vault.name`, `vault.root`, `vault.subpath`, and optional `designSkill`. **If absent, STOP** and tell the user to run `/spec:setup`. `{subpath}`=`vault.subpath`, `{root}`=`vault.root`.
 
 ## Vault protocol (applies to every vault write)
 
-1. **Guard the active vault.** Before writing, `mcp__obsidian__vault_read` `{subpath}/_index.md` and confirm its `vault:` frontmatter equals `vault.name`. Mismatch or missing → **STOP**: "Open the **<vault.name>** vault in Obsidian, then say continue."
-2. **Respect `_index.md`.** Before creating the plan note, read `{subpath}/Plans/_index.md` and copy its frontmatter template into the new plan — do not hardcode the frontmatter here.
-3. **Large files.** For plans the REST API truncates (~3000+ lines), use the `Write` tool against `{root}/{subpath}/Plans/<file>.md`; otherwise use `mcp__obsidian__vault_write`.
+1. **Guard the active vault.** The Obsidian MCP talks to whatever vault is _currently open_; it cannot switch. Before your first write, `mcp__obsidian__vault_read` `{subpath}/_index.md` and confirm its `vault:` frontmatter equals `vault.name`. Mismatch or missing → **STOP**: "Open the **<vault.name>** vault in Obsidian, then say continue."
+2. **Respect `_index.md` on every new note.** Before creating a note in any folder, read that folder's `_index.md` and **copy its frontmatter template** — never invent frontmatter. If the folder keeps a list, add the new note's entry.
+3. **Large files.** For notes the REST API truncates (~3000+ lines), use the `Write` tool against `{root}/{subpath}/...`; otherwise prefer `mcp__obsidian__vault_write` / `vault_patch`.
 
-## Workflow
+## Scale check (before anything else)
 
-**REQUIRED SUB-SKILL:** Use `superpowers:writing-plans` for plan structure, task granularity, TDD steps, no-placeholder discipline, and self-review. This skill only overrides *where the plan goes* and *what it must contain*.
+Trivial work — a bugfix with an obvious cause, a one-file tweak, a mechanical rename — does **not** need this workflow. Say so in one sentence and proceed directly. Use this skill when the work involves design decisions, new behaviour, or touches more than a couple of files.
 
-1. **Gather inputs from the vault first.** Read the spec, the relevant `{subpath}/Contexts/` glossary, and any related `{subpath}/ADRs/` via the obsidian MCP (`mcp__obsidian__vault_read`; use `vault_get_document_map` then read by heading for large notes). Map the affected code (e.g. with the Explore agent) before writing. **If the spec has a `## Design` section** (specs from `spec:brainstorm` do), open that design and embed a **Design reference** block in the plan repeating the design reference verbatim, so the executor builds against the approved visuals instead of guessing.
+## Phase 1 — Understand
 
-2. **Save to the vault, not the repo.** Write to `{subpath}/Plans/YYYY-MM-DD-<feature>.md`. Never write to `docs/superpowers/plans/`.
+- Explore project context **through Explore subagents**, not by reading piles of files into this session. The main context must stay lean — execution will usually happen here, and every file you read now is carried for the rest of the session.
+- Check `{subpath}/Features/`, `Specs/`, `ADRs/`, and the relevant `Contexts/` glossary for prior art before asking anything.
+- Ask clarifying questions **one at a time** (multiple-choice when possible). Focus: purpose, constraints, success criteria.
+- If the request spans multiple independent subsystems, stop and decompose first — one spec per sub-project.
+- Propose **2–3 approaches** with trade-offs; lead with your recommendation. YAGNI ruthlessly.
 
-3. **Plan frontmatter:** copy the template from `{subpath}/Plans/_index.md` (the folder's `_index.md` is the source of truth for the field set).
+## Phase 2 — Grill
 
-4. **MANDATORY: embed the Execution model policy section** (template below) near the top, right after the Tech Stack header. Decide which tasks are cross-cutting/**heavy** — large refactors, orchestration/engine code, deletions that cascade across files, hard debugging — and list them under `spec:plan-executor-heavy`; everything else goes under `spec:plan-executor`.
+Invoke `grill-with-docs` on the chosen approach — always, not "if terms look unsettled". Its domain docs live in the vault: read `{subpath}/Contexts/_index.md` first, then only the relevant glossary note(s); resolve terms inline into `{subpath}/Contexts/<context-slug>.md`; write any ADR to `{subpath}/ADRs/NNNN-<slug>.md` (number by `vault_list`-ing for the highest `NNNN`). Revise the design with whatever the grilling surfaces.
 
-## Execution model policy — paste into every plan, fill in the task lists
+## Phase 3 — Design skill (only if `designSkill` is set)
 
-````markdown
-## Execution model policy (enforce on a fresh session)
+When `config.designSkill` names a skill, invoke it **by that name** once the questions are answered — REQUIRED for any feature with a UI surface. Get visual approval and capture the **design reference** it reports (route to run, source file, states shown). If absent or the feature has no rendered surface, skip **and say so**.
 
-Run **subagent-driven**: the orchestrator reads this table and dispatches each task to a **pinned subagent** via the Agent tool's `subagent_type`. The agent's frontmatter fixes its model + effort, so the model is enforced by *which agent runs*, not by remembering to switch. One fresh subagent per task also clears context between tasks.
+## Phase 4 — Write the spec
 
-| Tasks | `subagent_type` | Pins |
-|---|---|---|
-| <routine task numbers> | `spec:plan-executor` | Sonnet, effort `high` |
-| <cross-cutting task numbers> | `spec:plan-executor-heavy` | Opus, effort `medium` |
-| A task stuck on a red test | re-dispatch to `spec:plan-executor-heavy` | Opus (`/effort xhigh` only to debug) |
+Write `{subpath}/Specs/<topic>-design.md` per the folder's `_index.md` template. Scale each section to its complexity:
 
-After each executor returns, the orchestrator dispatches `spec:plan-reviewer` (Opus, effort `high`, read-only) on the task's diff — Sonnet writes, Opus checks, catching missed detail cheaply. On **CHANGES-NEEDED**, re-dispatch the **same** executor with the fix list, then review again; on **APPROVE**, surface to the user for sign-off. Dispatch by **explicit** `subagent_type` (description matching is assistive only). The orchestrator stays on Sonnet or Opus-`low`; never leave `xhigh`/`max` as a standing default.
-````
+- **Summary / intent** — what and why, a few sentences
+- **Design decisions** — chosen approach, and why not the obvious alternatives
+- **Key facts** — everything discovered during exploration an implementer would otherwise re-derive: exact `file:line` anchors, existing helpers, persistence paths, conventions. This is the highest-value section — be generous here.
+- **Edge cases / invariants**
+- **Acceptance criteria** — checkable statements of done
+- **Out of scope**
+- **Verification** — how the result will be checked (commands, scenarios)
+- **`## Design`** — the design reference verbatim, if Phase 3 produced one
 
-The agents `spec:plan-executor`, `spec:plan-executor-heavy`, and `spec:plan-reviewer` ship with this plugin (plugin agents are namespaced — bare names don't resolve). If your harness can't see them, the plan can't execute as written — install/enable the `spec` plugin before relying on this section.
+The spec carries **decisions and facts, not implementations**: algorithm steps in prose are good; fenced blocks of the code to be written are not.
 
-## Executing it later
+**Self-review** (fix inline, no re-review): placeholders, internal contradictions, scope (one plan-able unit?), ambiguity. Then ask the user to review the spec before continuing.
 
-To run the finished plan in a fresh session, use the **`spec:execute`** skill.
+## Phase 5 — Plan doc: usually not
+
+Default: **no plan doc — the spec is enough.** Create `{subpath}/Plans/YYYY-MM-DD-<slug>.md` ONLY when execution genuinely needs a handoff artifact:
+
+- the work won't fit one session (multi-day, > ~10 substantial tasks), or
+- execution is deferred or will run in a fresh session via `spec:execute`, or
+- tasks will fan out to parallel subagents that each need a self-contained brief, or
+- the user asks for one.
+
+If yes, **read `references/plan-format.md` now** and follow it — plans are lean (no implementation code). Announce the decision in one sentence; the user can override.
+
+## Phase 6 — Pick the execution mode
+
+Read `references/execution-modes.md`, pick same-session (default) / same-session subagent-driven / handoff to `spec:execute`, announce the choice in one sentence, and start (or stop, if execution is deferred).
+
+## Red flags — STOP, you're about to regress
+
+| Rationalization                                                               | Reality                                                                                                              |
+| ----------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| "I'll put the implementation code in the plan so the executor can't go wrong" | That pays for the code twice and turns the executor into a typist. Plans carry intent + facts; executors write code. |
+| "Terms look settled, I'll skip grill-with-docs"                               | Grill is mandatory — terms get verified against the vault glossary, not assumed.                                     |
+| "The feature is big, so the plan should be detailed"                          | Big → plan doc, yes. Detailed → no. Lean format always.                                                              |
+| "I'll run the full build/lint/test suite after this task"                     | Full verification runs **once at the end** (or pre-PR). Per-task verification is targeted tests only.                |
+| "Sonnet is cheaper, I'll dispatch implementation to it"                       | Sonnet (`plan-executor-light`) only takes no-authorship chores. Authorship goes to the default executor.             |
+| "I'll read those files myself real quick"                                     | Bulk reading goes to subagents; this context must stay lean for execution.                                           |
+
+## Requires
+
+`grill-with-docs`, the `obsidian` MCP, and — if configured — the project's `designSkill`. If one is missing, tell the user before relying on the step that needs it.

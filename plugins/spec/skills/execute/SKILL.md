@@ -1,30 +1,34 @@
 ---
 name: execute
-description: Use when executing, running, or implementing an implementation plan stored in the project's Obsidian vault, or when the user invokes /spec:execute. Pins each task to the right model via dedicated subagents and gates every task behind an Opus review.
+description: Use when executing an implementation plan stored in the project's Obsidian vault in a fresh session, or when the user invokes /spec:execute. Subagent-driven with pinned models, per-task review gates, and escalation-only routing.
 ---
 
 # spec:execute
 
-Wrapper over the standard plan-execution loop that pins each task to the right model via dedicated subagents and gates every task behind an Opus review. Generic and config-driven.
+Runs a vault plan task-by-task through pinned subagents. Self-contained — no superpowers skills required. This is the **fresh-session handoff** path; if you are still in the session that wrote the spec, prefer same-session execution (see `spec:plan` → execution modes).
 
 ## Project config (read this first)
 
-Read the `spec` config — the fenced ```json under `## spec configuration` in `CLAUDE.local.md`. It provides `project`, `vault.name`, `vault.root`, `vault.subpath`. **If absent, STOP** and tell the user to run `/spec:setup`. `{subpath}` = `vault.subpath`.
+Read the `spec` config — the fenced ```json under `## spec configuration`in`CLAUDE.local.md`. It provides `project`, `vault.name`, `vault.root`, `vault.subpath`. **If absent, STOP** and tell the user to run `/spec:setup`. `{subpath}`=`vault.subpath`.
 
 ## Workflow
 
-**REQUIRED SUB-SKILL:** Use `superpowers:subagent-driven-development` for the per-task dispatch, checkpoints, and overall loop. This skill only overrides *which subagent* runs each task and *who reviews*.
+1. **Load the plan from the vault.** Confirm the active vault first: `mcp__obsidian__vault_read` `{subpath}/_index.md`, check its `vault:` frontmatter equals `vault.name`; mismatch → **STOP** and ask the user to open the right vault. Then read the plan (`vault_get_document_map`, then `vault_read` by heading for large plans) and its linked spec's **Key facts** section. The plan's **Execution model policy** table is the routing source of truth. Agents are namespaced — use `spec:plan-executor`, `spec:plan-executor-light`, `spec:plan-executor-heavy`, `spec:plan-reviewer`; map bare or legacy names from older plans onto these.
 
-1. **Load the plan from the vault.** Before reading, confirm the active vault: `mcp__obsidian__vault_read` `{subpath}/_index.md` and check its `vault:` frontmatter equals `vault.name`; mismatch → **STOP** and ask the user to open the **<vault.name>** vault in Obsidian. Then read `{subpath}/Plans/<plan>.md` (`vault_get_document_map`, then `vault_read` by heading for large plans). Read its **Execution model policy** table — that table is the routing source of truth.
+2. **Track tasks.** Create one task-list item per plan task; mark in_progress/completed as you go.
 
-2. **Dispatch each task by explicit `subagent_type`.** Use `spec:plan-executor` for routine tasks and `spec:plan-executor-heavy` for the tasks the table marks cross-cutting. Plugin agents are namespaced — the bare names (`plan-executor`, …) do not resolve. If the plan's table predates the namespacing and lists bare names, map them to the `spec:`-prefixed ones. Pass the task's full text (files, steps, code, commands) in the dispatch prompt. Do NOT auto-select an agent by its description.
+3. **Dispatch loop — per task:**
 
-3. **Review gate after every task.** When the executor returns, dispatch `spec:plan-reviewer` (read-only, Opus) on the task's diff. On **CHANGES-NEEDED**, re-dispatch the **same** executor with the reviewer's fix list, then review again. On **APPROVE**, surface the result to the user.
+   - Dispatch by **explicit** `subagent_type` from the policy table — never auto-select by description. The dispatch prompt must be self-contained: the task's full text, the plan's Conventions, and the relevant Key facts. Executors write the code themselves; do not write it for them and do not expect the plan to contain it.
+   - **Review gate (authorship tasks only):** when the executor returns, dispatch `spec:plan-reviewer` on the task's diff. On **CHANGES-NEEDED**, re-dispatch the **same** executor with the ordered fix list, then review again. On **APPROVE**, move on. Light (no-authorship) tasks skip review.
+   - **Escalation-only routing:** a task that failed, is stuck on a red test, or uncovered cross-file fallout gets re-dispatched to `spec:plan-executor-heavy` with the failure evidence attached. Never downgrade a task below its pin, and never "fix it quickly" in the orchestrator — that bypasses the review gate.
 
-4. **Honour stop gates.** If the plan says "stop and ask" before a task, stop and ask before dispatching it.
+4. **Honour stop gates.** If the plan says "stop and ask" before a task, stop and ask.
 
-5. **Keep the orchestrator cheap.** The main session only reads the plan, dispatches, and relays reviews — stay on Sonnet (or Opus-`low`). Never set `xhigh`/`max` as a standing default; bump effort only to debug a stuck test, then drop back.
+5. **Verification policy.** Executors run **targeted tests only**. The full verification (build + lint + full suite) is the plan's **final task**, run once — do not insert extra full runs between tasks; they make execution take ages for no added signal.
+
+6. **Keep the orchestrator lean.** Do not read changed files into this context — work from executor and reviewer reports. Relay a one-line progress note to the user after each task.
 
 ## Requires
 
-The agents `spec:plan-executor`, `spec:plan-executor-heavy`, and `spec:plan-reviewer` (they ship with the `spec` plugin, namespaced under it) and the `obsidian` MCP. If the agents aren't visible to your harness, enable the `spec` plugin before running.
+The agents `spec:plan-executor`, `spec:plan-executor-light`, `spec:plan-executor-heavy`, `spec:plan-reviewer` (ship with this plugin) and the `obsidian` MCP.
